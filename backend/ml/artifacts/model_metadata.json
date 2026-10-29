@@ -1,0 +1,21 @@
+{
+  "sklearn_version": "1.9.1",
+  "classes": [
+    "EMI & Loans",
+    "Entertainment & Subscriptions",
+    "Food & Dining",
+    "Groceries",
+    "Healthcare",
+    "Income & Salary",
+    "Investments",
+    "Shopping",
+    "Transfers",
+    "Travel & Transport",
+    "Utilities & Bills"
+  ],
+  "validation_f1": 0.9993,
+  "timestamp": "2026-10-29T11:02:45.231861+00:00",
+  "num_samples": 30000,
+  "num_train": 25500,
+  "num_val": 4500
+}
