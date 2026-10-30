@@ -1,6 +1,6 @@
 <div align="center">
 
-# FLUXO
+<p align="center"><img src="docs/banner.svg" alt="Fluxo: Know your future spend. PDF bank statement analyzer with SARIMA spending forecasts" width="100%"></p>
 
 **Know your future spend.**
 

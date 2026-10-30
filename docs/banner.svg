@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="100%" height="100%">
+  <title>Fluxo - Bank Statement Analyzer &amp; SARIMA Spending Forecaster</title>
+  <desc>Fluxo: Know your future spend. Deterministic PDF bank statement table extraction and SARIMA time-series spending forecaster with 90% confidence ribbons.</desc>
+
+  <defs>
+    <!-- Card Drop Shadow Filter -->
+    <filter id="cardShadow" x="-20%" y="-20%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000000" flood-opacity="0.32" />
+    </filter>
+    <filter id="badgeShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- 1. Flat Cyber-Yellow Canvas -->
+  <rect width="1280" height="400" fill="#FDE047" />
+
+  <!-- 2. Asymmetrical Liquid Bottom Wave (Transition to Onyx Void) -->
+  <path d="M 0 382 C 340 398 620 372 900 354 C 1080 342 1200 336 1280 330 L 1280 400 L 0 400 Z" fill="#0A0A0A" />
+
+  <!-- ==================== LEFT SIDE: HERO TYPOGRAPHY ==================== -->
+  <g id="hero-content">
+    <!-- Navbar-style Brand Pill -->
+    <g id="brand-pill" transform="translate(70, 36)">
+      <rect width="104" height="32" rx="16" fill="#0A0A0A" />
+      <!-- Logo Mark: Black disc with Cyber-Yellow Dot -->
+      <circle cx="20" cy="16" r="9" fill="#171717" stroke="#333333" stroke-width="1.5" />
+      <circle cx="20" cy="16" r="3.5" fill="#FDE047" />
+      <!-- Wordmark -->
+      <text x="37" y="21" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF" letter-spacing="-0.3">Fluxo</text>
+    </g>
+
+    <!-- Translucent Dark Pill Label -->
+    <g id="category-pill" transform="translate(70, 84)">
+      <rect width="194" height="26" rx="13" fill="#0A0A0A" fill-opacity="0.12" stroke="#0A0A0A" stroke-opacity="0.2" stroke-width="1" />
+      <circle cx="16" cy="13" r="3" fill="#0A0A0A" />
+      <text x="26" y="16.5" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="10" font-weight="800" fill="#0A0A0A" letter-spacing="1.5">SPENDING FORECASTING</text>
+    </g>
+
+    <!-- Massive Bold Headline -->
+    <g id="headline" fill="#0A0A0A" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" letter-spacing="-2.5">
+      <text x="70" y="178" font-size="64">KNOW YOUR</text>
+      <text x="70" y="242" font-size="64">FUTURE SPEND.</text>
+    </g>
+
+    <!-- Punchy Subline -->
+    <text x="72" y="282" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="600" fill="#171717" letter-spacing="-0.3">
+      PDF statements in. SARIMA forecasts out.
+    </text>
+
+    <!-- Interactive CTA Pill -->
+    <g id="cta-button" transform="translate(70, 308)">
+      <rect width="176" height="36" rx="18" fill="#0A0A0A" />
+      <text x="24" y="22.5" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">Upload Statement →</text>
+    </g>
+  </g>
+
+  <!-- ==================== RIGHT SIDE: TILTED PREVIEW CARD ==================== -->
+  <g id="preview-card" transform="translate(775, 48) rotate(6.5, 205, 135)">
+    <!-- Main Card Body -->
+    <rect width="410" height="270" rx="30" fill="#171717" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="1.5" filter="url(#cardShadow)" />
+
+    <!-- Card Header -->
+    <g id="card-header">
+      <circle cx="28" cy="30" r="4.5" fill="#FDE047" />
+      <text x="40" y="34" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="11" font-weight="800" fill="#E5E5E5" letter-spacing="1">FLUXO FORECAST</text>
+      
+      <!-- Sample Preview Chip -->
+      <rect x="286" y="20" width="98" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1" />
+      <text x="335" y="33" text-anchor="middle" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="8.5" font-weight="700" fill="#A3A3A3" letter-spacing="0.8">SAMPLE PREVIEW</text>
+    </g>
+
+    <line x1="20" y1="52" x2="390" y2="52" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1" />
+
+    <!-- Mini Chart Display Area -->
+    <g id="mini-chart" transform="translate(18, 64)">
+      <!-- Chart Canvas Background -->
+      <rect width="374" height="132" rx="18" fill="#0A0A0A" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1" />
+
+      <!-- Horizontal Grid Lines -->
+      <line x1="16" y1="44" x2="358" y2="44" stroke="#262626" stroke-width="1" stroke-dasharray="3 3" />
+      <line x1="16" y1="88" x2="358" y2="88" stroke="#262626" stroke-width="1" stroke-dasharray="3 3" />
+
+      <!-- Vertical "Forecast starts" Reference Divider -->
+      <line x1="172" y1="12" x2="172" y2="124" stroke="#525252" stroke-width="1" stroke-dasharray="3 3" />
+      <text x="176" y="24" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="7.5" fill="#737373">Forecast starts</text>
+
+      <!-- 90% Parametric Confidence Fan Ribbon (Expanding Polygon) -->
+      <polygon points="172,78 225,56 285,42 355,30 355,122 285,114 225,102 172,78" fill="#FDE047" fill-opacity="0.22" />
+
+      <!-- Solid Yellow Historical Spend Line -->
+      <path d="M 24 100 Q 64 62 104 88 T 172 78" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round" />
+      <circle cx="24" cy="100" r="3" fill="#FDE047" />
+      <circle cx="104" cy="88" r="3" fill="#FDE047" />
+      <circle cx="172" cy="78" r="4.5" fill="#FDE047" stroke="#0A0A0A" stroke-width="2" />
+
+      <!-- Dashed White SARIMA Point Forecast Line -->
+      <path d="M 172 78 Q 255 64 355 72" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />
+      <circle cx="355" cy="72" r="3.5" fill="#FFFFFF" />
+
+      <!-- Chart Labels -->
+      <text x="24" y="122" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="8.5" fill="#737373">Historical Spend</text>
+      <text x="354" y="24" text-anchor="end" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="8.5" font-weight="700" fill="#FDE047">SARIMA 90% CI</text>
+    </g>
+
+    <!-- Progress Bar & Model Metadata -->
+    <g id="card-footer" transform="translate(18, 208)">
+      <rect width="374" height="5" rx="2.5" fill="#262626" />
+      <rect width="270" height="5" rx="2.5" fill="#FDE047" />
+
+      <text x="2" y="28" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="9.5" fill="#A3A3A3">Model: SARIMAX(p,d,q)(P,D,Q,s)</text>
+      <circle cx="368" cy="24.5" r="3" fill="#4ADE80" />
+      <text x="360" y="28" text-anchor="end" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="9.5" font-weight="700" fill="#4ADE80">Active</text>
+    </g>
+
+    <!-- Floating Badge 1: Top-Left "Secure / SHA-256" -->
+    <g id="badge-security" transform="translate(-16, 42)" filter="url(#badgeShadow)">
+      <rect width="136" height="28" rx="14" fill="#0A0A0A" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1.2" />
+      <!-- Tiny Lock Icon -->
+      <g transform="translate(14, 7)">
+        <rect x="0" y="5" width="10" height="8" rx="1.5" fill="none" stroke="#FDE047" stroke-width="1.2" />
+        <path d="M 2 5 V 3.5 A 3 3 0 0 1 8 3.5 V 5" fill="none" stroke="#FDE047" stroke-width="1.2" />
+        <circle cx="5" cy="8.5" r="0.8" fill="#FDE047" />
+      </g>
+      <text x="32" y="18" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="9.5" font-weight="700" fill="#FFFFFF">Secure / SHA-256</text>
+    </g>
+
+    <!-- Floating Badge 2: Bottom-Right "90% CI Fan" -->
+    <g id="badge-ci" transform="translate(288, 250)" filter="url(#badgeShadow)">
+      <rect width="112" height="28" rx="14" fill="#0A0A0A" stroke="#FDE047" stroke-width="1.2" />
+      <circle cx="16" cy="14" r="3" fill="#FDE047" />
+      <text x="26" y="17.5" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="9.5" font-weight="800" fill="#FDE047">90% CI Fan</text>
+    </g>
+  </g>
+</svg>
