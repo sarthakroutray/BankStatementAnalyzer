@@ -3,60 +3,95 @@
 @tailwind utilities;
 
 :root {
-  --background: #0B0F19;
-  --foreground: #F8FAFC;
-  --card: #111827;
-  --card-foreground: #F8FAFC;
-  --border: #1E293B;
+  --background: #0A0A0A;
+  --foreground: #FFFFFF;
+  --card: #171717;
+  --card-foreground: #FFFFFF;
+  --border: rgba(255, 255, 255, 0.1);
 }
 
 @layer base {
   * {
     border-color: var(--border);
   }
-  
+
   body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-color: #0A0A0A;
+    color: #FFFFFF;
+    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 
-  code, pre, .font-mono {
-    font-family: var(--font-mono), 'JetBrains Mono', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-feature-settings: "zero", "ss01";
+  /* Currency and numeric tabular figures */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Institutional subtle background grid pattern */
-.bg-grid-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
 }
 
-/* Modern sleek custom scrollbars */
+.glass-card-dark {
+  background: rgba(23, 23, 23, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+}
+
+.glass-card-yellow {
+  background: rgba(253, 224, 71, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(253, 224, 71, 0.3);
+}
+
+/* Liquid / Asymmetrical Hero Bottom Edge */
+.liquid-hero-edge {
+  border-bottom-left-radius: 40px;
+  border-bottom-right-radius: 120px;
+}
+
+@media (min-width: 768px) {
+  .liquid-hero-edge {
+    border-bottom-left-radius: 60px;
+    border-bottom-right-radius: 140px;
+  }
+}
+
+/* Smooth custom scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0B0F19;
+  background: #0A0A0A;
 }
 ::-webkit-scrollbar-thumb {
-  background: #283548;
-  border-radius: 4px;
+  background: #262626;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3B82F6;
+  background: #FDE047;
 }
 
-/* Glassmorphism panels */
-.panel-glass {
-  background: rgba(17, 24, 39, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

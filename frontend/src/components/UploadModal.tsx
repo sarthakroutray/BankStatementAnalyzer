@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   X,
@@ -12,10 +12,13 @@ import {
   Cpu,
   Database,
   Layers,
-  FileSpreadsheet,
+  ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
 import { uploadStatement, generateForecast } from "../lib/api";
 import { UploadResponse } from "../lib/types";
+import { Button } from "./ui/Button";
+import { Pill } from "./ui/Pill";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -43,19 +46,19 @@ const STEPS: ProgressStep[] = [
     id: 2,
     label: "Tabular Extraction Engine",
     icon: Layers,
-    description: "Deterministic table extraction via pdfplumber or OCR fallback",
+    description: "Deterministic table extraction via JVM CLI or OCR fallback",
   },
   {
     id: 3,
     label: "Ledger Normalization & Deduplication",
     icon: Database,
-    description: "Standardizing amounts, ML category tagging & SHA-256 deduplication",
+    description: "Amount formatting, ML category tagging & SHA-256 deduplication",
   },
   {
     id: 4,
     label: "SARIMA Time-Series Calibration",
     icon: Cpu,
-    description: "Re-estimating model parameters and 90% confidence intervals",
+    description: "Re-estimating model parameters and 90% confidence ribbons",
   },
 ];
 
@@ -70,6 +73,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResponse | null>(null);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !isProcessing) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isProcessing, onClose]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       "application/pdf": [".pdf"],
@@ -78,6 +94,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       "image/webp": [".webp"],
     },
     maxFiles: 1,
+    disabled: isProcessing,
     onDrop: (acceptedFiles) => {
       if (acceptedFiles.length > 0) {
         setSelectedFile(acceptedFiles[0]);
@@ -100,206 +117,235 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     let timer2: NodeJS.Timeout | null = null;
 
     try {
-      timer1 = setTimeout(() => setCurrentStepIndex(2), 800);
-      timer2 = setTimeout(() => setCurrentStepIndex(3), 2000);
+      timer1 = setTimeout(() => {
+        setCurrentStepIndex(2); // Step 2: Tabular Extraction
+      }, 1200);
 
-      const res = await uploadStatement(selectedFile);
+      timer2 = setTimeout(() => {
+        setCurrentStepIndex(3); // Step 3: Normalization & Deduplication
+      }, 3500);
+
+      // Upload file directly
+      const uploadRes = await uploadStatement(selectedFile);
+
       if (timer1) clearTimeout(timer1);
       if (timer2) clearTimeout(timer2);
 
-      setResult(res);
+      setResult(uploadRes);
+      setCurrentStepIndex(4); // Step 4: SARIMA Calibration
 
-      const rowCount = res?.statement?.row_count ?? res?.parsed_rows?.length ?? 0;
-
-      if (rowCount === 0) {
-        setCurrentStepIndex(5);
-        onUploadSuccess(0);
-        return;
-      }
-
-      // Step 4: SARIMA Refit
-      setCurrentStepIndex(4);
+      // Calibrate SARIMA parameters
       try {
         await generateForecast("DAILY", 30);
       } catch (fErr) {
-        console.warn("Forecast refit notice:", fErr);
+        console.warn("Forecast re-calibration skipped or deferred:", fErr);
       }
 
-      // Completed
-      setCurrentStepIndex(5);
-      onUploadSuccess(rowCount);
-    } catch (err: any) {
+      setCurrentStepIndex(5); // Complete
+
+      // Notify parent of newly ingested records
+      setTimeout(() => {
+        onUploadSuccess(uploadRes.newly_inserted ?? 0);
+        handleClose();
+      }, 1400);
+    } catch (err: unknown) {
       if (timer1) clearTimeout(timer1);
       if (timer2) clearTimeout(timer2);
-      setErrorMsg(err.message || "Failed to process bank statement.");
-      setCurrentStepIndex(0);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred during statement processing.";
+      setErrorMsg(message);
     } finally {
-      if (timer1) clearTimeout(timer1);
-      if (timer2) clearTimeout(timer2);
       setIsProcessing(false);
     }
   };
 
-  const resetState = () => {
+  const handleClose = () => {
+    if (isProcessing) return;
     setSelectedFile(null);
     setCurrentStepIndex(0);
     setErrorMsg(null);
     setResult(null);
-    setIsProcessing(false);
+    onClose();
+  };
+
+  const getStepStatus = (stepId: number): StepStatus => {
+    if (errorMsg && currentStepIndex === stepId) return "error";
+    if (currentStepIndex > stepId) return "completed";
+    if (currentStepIndex === stepId) return "current";
+    return "pending";
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-slate-900/60">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-              Ingest Bank Statement
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Supports official statement files (PDF, JPG, PNG, WebP)
-            </p>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl"
+    >
+      <div
+        ref={modalRef}
+        className="w-full max-w-xl bg-charcoal/95 border border-white/20 rounded-[32px] p-6 sm:p-8 shadow-2xl backdrop-blur-2xl relative overflow-hidden transition-all ease-fluid"
+      >
+        {/* Top Header */}
+        <div className="flex items-center justify-between pb-5 border-b border-white/10">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-full bg-black border border-white/20 flex items-center justify-center text-cyber-yellow">
+              <UploadCloud className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 id="upload-modal-title" className="text-lg sm:text-xl font-bold text-white font-sans">
+                Upload Bank Statement
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Deterministic extraction with SHA-256 deduplication
+              </p>
+            </div>
           </div>
+
           <button
-            onClick={() => {
-              resetState();
-              onClose();
-            }}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            onClick={handleClose}
+            disabled={isProcessing}
+            aria-label="Close dialog"
+            className="w-8 h-8 rounded-full bg-deep-gray border border-white/10 flex items-center justify-center text-neutral-400 hover:text-white transition disabled:opacity-40"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-6">
-          {/* Dropzone */}
+        <div className="py-6 space-y-6">
+          {/* Dropzone Area */}
           {!isProcessing && currentStepIndex === 0 && (
-            <div>
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-3.5 ${
-                  isDragActive
-                    ? "border-blue-500 bg-blue-500/10"
-                    : "border-border hover:border-blue-500/50 hover:bg-slate-900/40"
-                }`}
-              >
-                <input {...getInputProps()} />
-                <div className="p-3.5 rounded-full bg-slate-900 border border-border text-blue-400">
-                  <UploadCloud className="w-8 h-8" />
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-[28px] p-8 text-center cursor-pointer transition-all duration-300 select-none ${
+                isDragActive
+                  ? "border-cyber-yellow bg-cyber-yellow/10 ring-4 ring-cyber-yellow/30 scale-[1.01]"
+                  : "border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]"
+              }`}
+            >
+              <input {...getInputProps()} aria-label="Drop statement PDF file here" />
+              <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-deep-gray border border-white/10 flex items-center justify-center text-cyber-yellow transition-transform group-hover:scale-110">
+                  <UploadCloud className="w-7 h-7" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">
-                    {selectedFile
-                      ? selectedFile.name
-                      : "Drag & drop statement file here, or click to browse"}
+                  <p className="text-sm font-semibold text-white font-sans">
+                    {isDragActive
+                      ? "Drop statement here..."
+                      : "Drag & drop PDF bank statement here"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Direct digital table parsing with OCR image fallback • Up to 25MB
+                  <p className="text-xs text-neutral-400 mt-1">
+                    or click to browse from device (PDF, PNG, JPG)
                   </p>
                 </div>
-                <div className="flex items-center space-x-2 pt-1">
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">
-                    PDF
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">
-                    PNG
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">
-                    JPG / JPEG
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">
-                    WEBP
-                  </span>
+                <div className="flex items-center space-x-2 text-[10px] font-mono text-neutral-500 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyber-yellow" />
+                  <span>Encrypted client-to-server TLS transfer</span>
                 </div>
               </div>
-
-              {selectedFile && (
-                <div className="mt-4 flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-border text-xs">
-                  <div className="flex items-center space-x-2.5 truncate">
-                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span className="text-white font-medium truncate">{selectedFile.name}</span>
-                    <span className="text-slate-400 font-mono text-[11px]">
-                      ({(selectedFile.size / 1024).toFixed(1)} KB)
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setSelectedFile(null)}
-                    className="text-rose-400 hover:text-rose-300 text-xs ml-2 font-medium"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
-          {/* Stepper Progress */}
-          {(isProcessing || currentStepIndex > 0) && (
-            <div className="space-y-4">
-              <div className="space-y-2.5">
-                {STEPS.map((step) => {
-                  const StepIcon = step.icon;
-                  const isZeroRows = result ? (result.statement?.row_count ?? result.parsed_rows?.length ?? 0) === 0 : false;
-                  const isStepSkipped = step.id === 4 && isZeroRows && currentStepIndex >= 5;
+          {/* Selected File Chip */}
+          {selectedFile && currentStepIndex === 0 && (
+            <div className="flex items-center justify-between p-4 rounded-[20px] bg-deep-gray border border-white/10">
+              <div className="flex items-center space-x-3 truncate">
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-cyber-yellow shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <p className="text-xs font-semibold text-white truncate font-sans">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-[10px] font-mono text-neutral-400">
+                    {(selectedFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedFile(null);
+                }}
+                className="p-1 rounded-full text-neutral-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
-                  let status: StepStatus = "pending";
-                  if (isStepSkipped) status = "skipped";
-                  else if (currentStepIndex > step.id) status = "completed";
-                  else if (currentStepIndex === step.id) status = isProcessing ? "current" : "completed";
+          {/* Processing Stepper */}
+          {isProcessing || currentStepIndex > 0 ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-3">
+                {STEPS.map((step) => {
+                  const status = getStepStatus(step.id);
+                  const Icon = step.icon;
 
                   return (
                     <div
                       key={step.id}
-                      className={`flex items-start space-x-3 p-3 rounded-lg border transition ${
-                        status === "current"
-                          ? "bg-blue-500/10 border-blue-500/40"
-                          : status === "completed"
-                          ? "bg-emerald-500/5 border-emerald-500/20"
-                          : status === "skipped"
-                          ? "bg-amber-500/5 border-amber-500/20"
-                          : "bg-slate-900/30 border-border/40 opacity-40"
+                      className={`flex items-start space-x-3.5 p-3.5 rounded-[20px] border transition-all duration-300 ${
+                        status === "completed"
+                          ? "bg-white/[0.03] border-white/15"
+                          : status === "current"
+                          ? "bg-cyber-yellow/5 border-cyber-yellow/40 shadow-sm"
+                          : status === "error"
+                          ? "bg-danger/10 border-danger/30"
+                          : "bg-transparent border-transparent opacity-40"
                       }`}
                     >
-                      <div className="mt-0.5">
+                      <div className="mt-0.5 shrink-0">
                         {status === "completed" ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <div className="w-6 h-6 rounded-full bg-success/20 text-success flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
                         ) : status === "current" ? (
-                          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                        ) : status === "skipped" ? (
-                          <AlertCircle className="w-4 h-4 text-amber-400" />
+                          <div className="w-6 h-6 rounded-full bg-cyber-yellow text-black flex items-center justify-center animate-pulse">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          </div>
+                        ) : status === "error" ? (
+                          <div className="w-6 h-6 rounded-full bg-danger text-white flex items-center justify-center">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                          </div>
                         ) : (
-                          <StepIcon className="w-4 h-4 text-slate-500" />
+                          <div className="w-6 h-6 rounded-full bg-deep-gray text-neutral-500 flex items-center justify-center">
+                            <Icon className="w-3.5 h-3.5" />
+                          </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
+
+                      <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-semibold text-white">{step.label}</p>
-                          <span
-                            className={`text-[10px] uppercase font-mono tracking-wider ${
-                              status === "completed"
-                                ? "text-emerald-400"
-                                : status === "current"
-                                ? "text-blue-400"
-                                : status === "skipped"
-                                ? "text-amber-400"
-                                : "text-slate-500"
+                          <p
+                            className={`text-xs font-semibold font-sans ${
+                              status === "current"
+                                ? "text-cyber-yellow"
+                                : status === "completed"
+                                ? "text-white"
+                                : status === "error"
+                                ? "text-danger"
+                                : "text-neutral-500"
                             }`}
                           >
-                            {status === "completed"
-                              ? "Done"
-                              : status === "current"
-                              ? "Running"
-                              : status === "skipped"
-                              ? "Skipped"
-                              : "Queued"}
-                          </span>
+                            {step.label}
+                          </p>
+                          {status === "completed" && (
+                            <span className="text-[10px] font-mono text-success font-bold">
+                              DONE
+                            </span>
+                          )}
+                          {status === "current" && (
+                            <span className="text-[10px] font-mono text-cyber-yellow animate-pulse">
+                              RUNNING
+                            </span>
+                          )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {isStepSkipped
-                            ? "Skipped: 0 new debit transactions available for forecasting"
-                            : step.description}
+                        <p className="text-[11px] text-neutral-400 mt-0.5 leading-snug">
+                          {step.description}
                         </p>
                       </div>
                     </div>
@@ -307,77 +353,65 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 })}
               </div>
 
-              {/* Completion Summary Card */}
-              {result && currentStepIndex >= 5 && (
-                (result.statement?.row_count ?? result.parsed_rows?.length ?? 0) === 0 ? (
-                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
-                    <div className="flex items-center space-x-2 font-semibold text-amber-400">
-                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>No Tabular Transactions Detected</span>
-                    </div>
-                    <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                      No transaction rows could be parsed from this document. Please ensure the file has a recognizable statement table or is not password protected.
-                    </p>
+              {/* Success Result Summary */}
+              {currentStepIndex === 5 && result && (
+                <div className="p-4 rounded-[20px] bg-cyber-yellow/10 border border-cyber-yellow/30 text-xs text-white">
+                  <div className="flex items-center justify-between font-mono">
+                    <span className="text-cyber-yellow font-bold">Extraction Complete</span>
+                    <span className="text-white font-bold tabular-nums">
+                      +{result.newly_inserted ?? 0} rows parsed
+                    </span>
                   </div>
-                ) : (
-                  <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-white space-y-2">
-                    <div className="flex items-center space-x-2 font-semibold text-emerald-400">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Ingestion & Normalization Complete</span>
-                    </div>
-                    <div className="font-mono text-[11px] space-y-1 text-slate-300">
-                      <p>• {result.newly_inserted} new transaction records committed to database</p>
-                      <p>• {result.duplicates_skipped} duplicates skipped via SHA-256 row verification</p>
-                      <p>• SARIMA time-series model calibrated with updated spend history</p>
-                    </div>
-                  </div>
-                )
+                </div>
               )}
             </div>
-          )}
+          ) : null}
 
-          {/* Error Message */}
+          {/* Error Message Box */}
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-start space-x-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+            <div className="p-4 rounded-[20px] bg-danger/10 border border-danger/30 text-xs text-danger space-y-1">
+              <div className="flex items-center space-x-1.5 font-bold">
+                <AlertCircle className="w-4 h-4" />
+                <span>Processing Error</span>
+              </div>
+              <p className="text-neutral-300 text-[11px] leading-relaxed">{errorMsg}</p>
             </div>
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-900/60 border-t border-border flex items-center justify-end space-x-3">
-          {currentStepIndex >= 5 ? (
-            <button
-              onClick={() => {
-                resetState();
-                onClose();
-              }}
-              className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition shadow-sm"
+        {/* Modal Actions */}
+        <div className="pt-4 border-t border-white/10 flex items-center justify-end space-x-3">
+          <Button
+            variant="outline-white"
+            size="sm"
+            onClick={handleClose}
+            disabled={isProcessing}
+          >
+            {currentStepIndex === 5 ? "Close" : "Cancel"}
+          </Button>
+
+          {currentStepIndex === 0 && (
+            <Button
+              variant="yellow"
+              size="sm"
+              onClick={handleStartUpload}
+              disabled={!selectedFile || isProcessing}
+              className="flex items-center space-x-1.5"
             >
-              Done & View Dashboard
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  resetState();
-                  onClose();
-                }}
-                disabled={isProcessing}
-                className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-white transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStartUpload}
-                disabled={!selectedFile || isProcessing}
-                className="flex items-center space-x-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition disabled:opacity-50 shadow-sm"
-              >
-                {isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
-                <span>{isProcessing ? "Ingesting..." : "Process Statement"}</span>
-              </button>
-            </>
+              <span>Process Statement</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          )}
+
+          {errorMsg && (
+            <Button
+              variant="yellow"
+              size="sm"
+              onClick={handleStartUpload}
+              className="flex items-center space-x-1.5"
+            >
+              <span>Retry</span>
+            </Button>
           )}
         </div>
       </div>

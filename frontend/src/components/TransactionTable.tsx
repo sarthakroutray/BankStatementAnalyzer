@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Search,
-  Filter,
   ArrowUpRight,
   ArrowDownLeft,
   ChevronLeft,
@@ -18,8 +17,12 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
+  Receipt,
+  ArrowUpDown,
 } from "lucide-react";
 import { Transaction } from "../lib/types";
+import { Pill } from "./ui/Pill";
+import { Button } from "./ui/Button";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -58,14 +61,14 @@ const CATEGORIES = [
 ];
 
 const CATEGORY_STYLES: Record<string, string> = {
-  "Food & Dining": "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  Groceries: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  Utilities: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-  Travel: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  Subscriptions: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  Transfers: "bg-slate-700/40 text-slate-300 border-slate-600/40",
-  Shopping: "bg-pink-500/10 text-pink-400 border-pink-500/20",
-  Other: "bg-slate-800 text-slate-400 border-slate-700/60",
+  "Food & Dining": "bg-amber-400/10 text-amber-300 border-amber-400/20",
+  Groceries: "bg-emerald-400/10 text-emerald-300 border-emerald-400/20",
+  Utilities: "bg-cyan-400/10 text-cyan-300 border-cyan-400/20",
+  Travel: "bg-blue-400/10 text-blue-300 border-blue-400/20",
+  Subscriptions: "bg-purple-400/10 text-purple-300 border-purple-400/20",
+  Transfers: "bg-white/10 text-neutral-300 border-white/15",
+  Shopping: "bg-pink-400/10 text-pink-300 border-pink-400/20",
+  Other: "bg-deep-gray text-neutral-400 border-white/10",
 };
 
 export const TransactionTable: React.FC<TransactionTableProps> = ({
@@ -95,17 +98,46 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   const [editCategory, setEditCategory] = useState<string>("");
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
+  // Sorting state for client-side sorting of loaded data
+  const [sortField, setSortField] = useState<"date" | "amount" | "description">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
   // Deletion States
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<Transaction | null>(null);
   const [isDeletingSingle, setIsDeletingSingle] = useState<boolean>(false);
-  const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
-  const [isDeletingAll, setIsDeletingAll] = useState<boolean>(false);
 
-  const totalPages = Math.ceil(total / pageSize) || 1;
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState<boolean>(false);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Client-side sorted transactions
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "date") {
+        comparison = new Date(a.txn_date).getTime() - new Date(b.txn_date).getTime();
+      } else if (sortField === "amount") {
+        comparison = Number(a.amount) - Number(b.amount);
+      } else if (sortField === "description") {
+        comparison = (a.description || "").localeCompare(b.description || "");
+      }
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [transactions, sortField, sortDirection]);
+
+  const handleSort = (field: "date" | "amount" | "description") => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
 
   const handleStartEdit = (txn: Transaction) => {
     setEditingId(txn.id);
-    setEditCategory(txn.category);
+    setEditCategory(txn.category || "Other");
   };
 
   const handleSaveEdit = async (txnId: string) => {
@@ -114,319 +146,336 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
     try {
       await onUpdateCategory(txnId, editCategory);
       setEditingId(null);
-    } catch (err) {
-      console.error("Failed to update transaction category:", err);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // CSV Export utility
-  const handleExportCSV = () => {
+  const confirmSingleDelete = async () => {
+    if (!singleDeleteTarget || !onDeleteTransaction) return;
+    setIsDeletingSingle(true);
+    try {
+      await onDeleteTransaction(singleDeleteTarget.id);
+      setSingleDeleteTarget(null);
+    } finally {
+      setIsDeletingSingle(false);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!onDeleteAllTransactions) return;
+    setIsDeletingBulk(true);
+    try {
+      await onDeleteAllTransactions();
+      setIsBulkDeleteModalOpen(false);
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
+  const exportCSV = () => {
     if (!transactions.length) return;
-    const headers = ["ID", "Date", "Description", "Category", "Type", "Amount", "Balance", "Hash"];
+    const headers = ["Date", "Description", "Type", "Amount", "Category"];
     const rows = transactions.map((t) => [
-      t.id,
       t.txn_date,
       `"${(t.description || "").replace(/"/g, '""')}"`,
-      t.category,
       t.txn_type,
-      typeof t.amount === "number" ? t.amount.toFixed(2) : t.amount,
-      t.balance !== null && t.balance !== undefined ? t.balance : "",
-      t.row_hash,
+      Number(t.amount).toFixed(2),
+      t.category || "Other",
     ]);
-
     const csvContent =
       "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `finwise_ledger_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `Fluxo_Ledger_Export_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="bg-card border border-border/80 rounded-xl p-5 sm:p-6 shadow-subtle flex flex-col justify-between">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-border/60">
-        <div className="flex items-center justify-between w-full lg:w-auto">
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Normalized Transaction Ledger
-              </h2>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono border border-slate-700">
-                {total.toLocaleString()} records
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Deduplicated transactions extracted deterministically with AI categorization overrides
-            </p>
+    <div className="bg-charcoal/90 border border-white/10 rounded-[32px] p-6 sm:p-8 shadow-glass backdrop-blur-2xl">
+      {/* Table Header & Search Filter Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-white/10">
+        <div>
+          <div className="flex items-center space-x-3">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-sans">
+              Normalized Transaction Ledger
+            </h2>
+            <Pill variant="neutral" className="tabular-nums">
+              {total.toLocaleString()} RECORDS
+            </Pill>
           </div>
-          {viewAllHref && (
-            <Link
-              href={viewAllHref}
-              className="lg:hidden text-xs text-blue-400 hover:text-blue-300 flex items-center font-medium"
-            >
-              <span>Full Ledger</span>
-              <ArrowRight className="w-3 h-3 ml-0.5" />
-            </Link>
-          )}
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+            Deterministic SHA-256 deduplicated records with ML merchant categorization
+          </p>
         </div>
 
-        {/* Filter bar */}
+        {/* Global Table Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search description..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 pr-7 py-1.5 rounded-lg bg-slate-900 border border-border text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-40 sm:w-52 transition"
-            />
-            {search && (
-              <button
-                onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                title="Clear search"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter */}
-          <div className="relative flex items-center">
-            <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-            <select
-              value={category}
-              onChange={(e) => onCategoryChange(e.target.value)}
-              className="pl-7 pr-3 py-1.5 rounded-lg bg-slate-900 border border-border text-xs text-white appearance-none focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c === "All" ? "All Categories" : c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Type Filter */}
-          <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-border text-xs">
-            {["ALL", "DEBIT", "CREDIT"].map((t) => (
-              <button
-                key={t}
-                onClick={() => onTxnTypeChange(t)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                  txnType === t
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-muted-foreground hover:text-white"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          {/* Date Pickers (if handlers provided) */}
-          {onStartDateChange && (
-            <div className="flex items-center space-x-1 bg-slate-900 px-2 py-1 rounded-lg border border-border text-xs">
-              <Calendar className="w-3 h-3 text-slate-400" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => onStartDateChange(e.target.value)}
-                className="bg-transparent text-white text-[11px] focus:outline-none"
-                title="Start Date"
-              />
-              <span className="text-slate-500">-</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => onEndDateChange?.(e.target.value)}
-                className="bg-transparent text-white text-[11px] focus:outline-none"
-                title="End Date"
-              />
-              {(startDate || endDate) && (
-                <button
-                  onClick={() => {
-                    onStartDateChange("");
-                    onEndDateChange?.("");
-                  }}
-                  className="text-slate-400 hover:text-white pl-1"
-                  title="Clear date filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* CSV Export Button */}
           {showExport && (
-            <button
-              onClick={handleExportCSV}
-              disabled={transactions.length === 0}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-border text-xs font-medium transition disabled:opacity-40"
-              title="Download CSV of current table records"
+            <Button
+              variant="outline-white"
+              size="sm"
+              onClick={exportCSV}
+              disabled={loading || transactions.length === 0}
+              className="flex items-center space-x-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
+              <span>Export CSV</span>
+            </Button>
           )}
 
-          {/* Delete All Button */}
-          {onDeleteAllTransactions && (
-            <button
-              onClick={() => setShowDeleteAllModal(true)}
-              disabled={total === 0 || loading || isDeletingAll}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
-              title={total === 0 ? "No transactions to delete" : "Delete all transactions from database"}
+          {onDeleteAllTransactions && total > 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              className="flex items-center space-x-1.5"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete All</span>
-            </button>
+              <span>Clear Ledger</span>
+            </Button>
           )}
 
           {viewAllHref && (
-            <Link
-              href={viewAllHref}
-              className="hidden lg:flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-blue-600/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600/20 text-xs font-medium transition ml-1"
-            >
-              <span>Full Ledger</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            <Link href={viewAllHref}>
+              <Button variant="yellow" size="sm" className="flex items-center space-x-1.5">
+                <span>View Full Studio</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
             </Link>
           )}
         </div>
       </div>
 
-      {/* Table view */}
-      <div className="overflow-x-auto mt-4">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border/80 text-muted-foreground uppercase tracking-wider font-semibold text-[11px]">
-              <th className="py-2.5 px-3">Date</th>
-              <th className="py-2.5 px-3">Description</th>
-              <th className="py-2.5 px-3">Category</th>
-              <th className="py-2.5 px-3">Type</th>
-              <th className="py-2.5 px-3 text-right">Amount</th>
-              <th className="py-2.5 px-3 text-right">Balance</th>
-              {onDeleteTransaction && <th className="py-2.5 px-3 text-right">Action</th>}
+      {/* Filter Ribbon: Search, Type, Category & Date Ranges */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 py-5 border-b border-white/10 text-xs">
+        {/* Search Input */}
+        <div className="md:col-span-5 relative">
+          <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search merchant, memo or description..."
+            className="w-full pl-9 pr-8 py-2.5 rounded-full bg-deep-gray border border-white/10 text-white placeholder-neutral-500 focus:outline-none focus:border-cyber-yellow transition text-xs font-sans"
+          />
+          {search && (
+            <button
+              onClick={() => onSearchChange("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Transaction Type Filter */}
+        <div className="md:col-span-3">
+          <div className="flex items-center p-1 rounded-full bg-deep-gray border border-white/10">
+            {(["ALL", "DEBIT", "CREDIT"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => onTxnTypeChange(type)}
+                className={`flex-1 py-1.5 rounded-full text-xs font-mono font-semibold transition-all duration-200 ${
+                  txnType === type
+                    ? "bg-white text-black shadow-sm"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Category Dropdown */}
+        <div className="md:col-span-4">
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-full bg-deep-gray border border-white/10 text-white focus:outline-none focus:border-cyber-yellow transition text-xs font-sans appearance-none cursor-pointer"
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat} className="bg-charcoal text-white">
+                Category: {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table Container */}
+      <div className="mt-4 overflow-x-auto rounded-[24px] border border-white/10">
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="sticky top-0 bg-deep-gray/95 backdrop-blur-md text-[10px] uppercase tracking-widest text-neutral-400 font-mono border-b border-white/10">
+            <tr>
+              <th
+                onClick={() => handleSort("date")}
+                className="py-3.5 px-4 font-bold cursor-pointer hover:text-white transition"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <span>Date</span>
+                  <ArrowUpDown className="w-3 h-3 text-neutral-500" />
+                </div>
+              </th>
+              <th
+                onClick={() => handleSort("description")}
+                className="py-3.5 px-4 font-bold cursor-pointer hover:text-white transition"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <span>Description</span>
+                  <ArrowUpDown className="w-3 h-3 text-neutral-500" />
+                </div>
+              </th>
+              <th className="py-3.5 px-4 font-bold">Category</th>
+              <th className="py-3.5 px-4 font-bold text-center">Type</th>
+              <th
+                onClick={() => handleSort("amount")}
+                className="py-3.5 px-4 font-bold text-right cursor-pointer hover:text-white transition"
+              >
+                <div className="flex items-center justify-end space-x-1.5">
+                  <span>Amount</span>
+                  <ArrowUpDown className="w-3 h-3 text-neutral-500" />
+                </div>
+              </th>
+              {onDeleteTransaction && (
+                <th className="py-3.5 px-4 font-bold text-center">Actions</th>
+              )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/40 font-mono">
+          <tbody className="divide-y divide-white/5 font-sans">
             {loading ? (
               <tr>
-                <td colSpan={onDeleteTransaction ? 7 : 6} className="py-12 text-center text-muted-foreground font-sans">
-                  Querying transactions from PostgreSQL...
+                <td colSpan={6} className="py-16 text-center text-neutral-400 font-mono">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <Loader2 className="w-6 h-6 text-cyber-yellow animate-spin" />
+                    <span>Loading ledger records...</span>
+                  </div>
                 </td>
               </tr>
-            ) : transactions.length === 0 ? (
+            ) : sortedTransactions.length === 0 ? (
               <tr>
-                <td colSpan={onDeleteTransaction ? 7 : 6} className="py-12 text-center text-muted-foreground font-sans">
-                  No matching transactions found. Try adjusting filters or search query.
+                <td colSpan={6} className="py-16 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Receipt className="w-8 h-8 text-neutral-600 mb-1" />
+                    <p className="text-sm font-semibold text-white">No transactions match your query</p>
+                    <p className="text-xs text-neutral-400 max-w-sm">
+                      Upload bank statements to ingest records or adjust your active search filters.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
-              transactions.map((txn) => {
+              sortedTransactions.map((txn) => {
                 const isDebit = txn.txn_type === "DEBIT";
                 const isEditing = editingId === txn.id;
-                const amt = typeof txn.amount === "number" ? txn.amount : (parseFloat(String(txn.amount)) || 0);
-                const bal = txn.balance !== null && txn.balance !== undefined
-                  ? typeof txn.balance === "number" ? txn.balance : parseFloat(String(txn.balance))
-                  : null;
+                const numericAmount = Number(txn.amount) || 0;
 
                 return (
-                  <tr key={txn.id} className="hover:bg-slate-900/60 transition group">
-                    <td className="py-3 px-3 text-slate-400 whitespace-nowrap">{txn.txn_date}</td>
-                    <td className="py-3 px-3 text-slate-200 font-sans max-w-sm truncate" title={txn.description}>
+                  <tr
+                    key={txn.id}
+                    className="hover:bg-white/[0.03] transition-colors group"
+                  >
+                    {/* Date */}
+                    <td className="py-3.5 px-4 font-mono text-neutral-300 tabular-nums">
+                      {txn.txn_date}
+                    </td>
+
+                    {/* Description */}
+                    <td className="py-3.5 px-4 text-white font-medium max-w-xs sm:max-w-md truncate">
                       {txn.description}
                     </td>
 
-                    {/* Category with inline override */}
-                    <td className="py-3 px-3 whitespace-nowrap font-sans">
+                    {/* Category Pill / Inline Editor */}
+                    <td className="py-3.5 px-4">
                       {isEditing ? (
                         <div className="flex items-center space-x-1.5">
                           <select
                             value={editCategory}
                             onChange={(e) => setEditCategory(e.target.value)}
-                            className="py-1 px-2 text-xs rounded bg-slate-900 border border-blue-500 text-white focus:outline-none"
+                            className="bg-deep-gray border border-cyber-yellow text-white text-xs rounded-full px-3 py-1 font-sans focus:outline-none"
                           >
-                            {CATEGORIES.filter((c) => c !== "All").map((cat) => (
-                              <option key={cat} value={cat}>
-                                {cat}
+                            {CATEGORIES.filter((c) => c !== "All").map((c) => (
+                              <option key={c} value={c} className="bg-charcoal text-white">
+                                {c}
                               </option>
                             ))}
                           </select>
                           <button
                             onClick={() => handleSaveEdit(txn.id)}
                             disabled={isUpdating}
-                            className="p-1 rounded bg-blue-600 text-white hover:bg-blue-500"
+                            className="p-1 rounded-full bg-cyber-yellow text-black hover:bg-yellow-300 transition"
                             title="Save"
                           >
-                            <Check className="w-3 h-3" />
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="p-1 rounded-full bg-deep-gray text-neutral-400 hover:text-white transition"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => handleStartEdit(txn)}
-                          className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium border transition ${
-                            CATEGORY_STYLES[txn.category] || CATEGORY_STYLES["Other"]
-                          } hover:brightness-125`}
+                          className={`inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full text-[11px] font-medium border transition-transform hover:scale-105 ${
+                            CATEGORY_STYLES[txn.category || "Other"] ||
+                            CATEGORY_STYLES["Other"]
+                          }`}
                           title="Click to override category"
                         >
-                          <Tag className="w-2.5 h-2.5 mr-0.5 opacity-70" />
-                          <span>{txn.category}</span>
+                          <span>{txn.category || "Other"}</span>
+                          <Tag className="w-2.5 h-2.5 opacity-60" />
                         </button>
                       )}
                     </td>
 
                     {/* Type Badge */}
-                    <td className="py-3 px-3 whitespace-nowrap font-sans">
+                    <td className="py-3.5 px-4 text-center font-mono">
                       <span
-                        className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${
                           isDebit
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            ? "bg-danger/10 text-danger border border-danger/20"
+                            : "bg-success/10 text-success border border-success/20"
                         }`}
                       >
                         {isDebit ? (
-                          <ArrowUpRight className="w-3 h-3 mr-0.5" />
+                          <ArrowUpRight className="w-2.5 h-2.5 mr-0.5" />
                         ) : (
-                          <ArrowDownLeft className="w-3 h-3 mr-0.5" />
+                          <ArrowDownLeft className="w-2.5 h-2.5 mr-0.5" />
                         )}
                         {txn.txn_type}
                       </span>
                     </td>
 
                     {/* Amount */}
-                    <td
-                      className={`py-3 px-3 text-right font-bold whitespace-nowrap ${
-                        isDebit ? "text-rose-400" : "text-emerald-400"
-                      }`}
-                    >
-                      {isDebit ? "-" : "+"}${amt.toFixed(2)}
+                    <td className="py-3.5 px-4 text-right font-mono font-bold tabular-nums">
+                      <span
+                        className={
+                          isDebit ? "text-danger" : "text-success"
+                        }
+                      >
+                        {isDebit ? "-" : "+"}
+                        ${numericAmount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </td>
 
-                    {/* Running Balance */}
-                    <td className="py-3 px-3 text-right text-slate-400 whitespace-nowrap">
-                      {bal !== null && !isNaN(bal) ? `$${bal.toFixed(2)}` : "—"}
-                    </td>
-
-                    {/* Delete Action */}
+                    {/* Actions */}
                     {onDeleteTransaction && (
-                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-center">
                         <button
                           onClick={() => setSingleDeleteTarget(txn)}
-                          disabled={isDeletingSingle}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition disabled:opacity-40"
-                          title="Delete this transaction"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-full text-neutral-500 hover:text-danger hover:bg-danger/10 transition"
+                          title="Delete transaction"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -441,197 +490,105 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 mt-3 border-t border-border/60 text-xs text-muted-foreground">
+      <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400 font-mono">
         <div>
-          Showing {transactions.length > 0 ? (page - 1) * pageSize + 1 : 0} to{" "}
-          {Math.min(page * pageSize, total)} of {total.toLocaleString()} records
+          Showing page <span className="text-white font-bold tabular-nums">{page}</span> of{" "}
+          <span className="text-white font-bold tabular-nums">{totalPages}</span> (
+          <span className="tabular-nums">{total}</span> total entries)
         </div>
+
         <div className="flex items-center space-x-2">
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1 || loading}
-            className="p-1.5 rounded-lg border border-border bg-slate-900 hover:bg-slate-800 disabled:opacity-30 transition"
+            className="px-3.5 py-1.5 rounded-full bg-deep-gray border border-white/10 hover:border-white/30 text-white disabled:opacity-30 disabled:pointer-events-none transition flex items-center space-x-1"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Prev</span>
           </button>
-          <span className="font-mono px-2 text-slate-300">
-            Page {page} of {totalPages}
-          </span>
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages || loading}
-            className="p-1.5 rounded-lg border border-border bg-slate-900 hover:bg-slate-800 disabled:opacity-30 transition"
+            className="px-3.5 py-1.5 rounded-full bg-deep-gray border border-white/10 hover:border-white/30 text-white disabled:opacity-30 disabled:pointer-events-none transition flex items-center space-x-1"
           >
-            <ChevronRight className="w-4 h-4" />
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Single Delete Confirmation Modal */}
       {singleDeleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-card border border-border rounded-xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-slate-900/60">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  <Trash2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">Delete Transaction</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Confirm permanent record removal</p>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-charcoal border border-white/20 rounded-[32px] p-6 shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center space-x-3 text-danger mb-4">
+              <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
               </div>
-              <button
-                onClick={() => !isDeletingSingle && setSingleDeleteTarget(null)}
-                className="text-slate-400 hover:text-white transition"
+              <h3 className="text-lg font-bold text-white font-sans">Delete Transaction?</h3>
+            </div>
+            <p className="text-xs text-neutral-300 mb-4 leading-relaxed font-sans">
+              This will permanently purge this record from your database ledger and recalibrate the time-series model.
+            </p>
+            <div className="p-3 rounded-2xl bg-deep-gray border border-white/10 font-mono text-xs mb-5">
+              <div className="text-white truncate font-semibold">{singleDeleteTarget.description}</div>
+              <div className="flex justify-between text-neutral-400 mt-1">
+                <span>{singleDeleteTarget.txn_date}</span>
+                <span className="text-white font-bold">${Number(singleDeleteTarget.amount).toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-end space-x-3">
+              <Button
+                variant="outline-white"
+                size="sm"
+                onClick={() => setSingleDeleteTarget(null)}
                 disabled={isDeletingSingle}
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Are you sure you want to delete this transaction from the ledger? This action cannot be reversed.
-              </p>
-
-              <div className="p-3.5 rounded-lg bg-slate-900/80 border border-border/60 text-xs space-y-2 font-mono">
-                <div className="flex justify-between text-slate-400">
-                  <span className="font-sans">Date:</span>
-                  <span className="text-slate-200">{singleDeleteTarget.txn_date}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span className="font-sans">Description:</span>
-                  <span className="text-slate-200 truncate max-w-[200px]" title={singleDeleteTarget.description}>
-                    {singleDeleteTarget.description}
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span className="font-sans">Amount:</span>
-                  <span className={`font-bold ${singleDeleteTarget.txn_type === "DEBIT" ? "text-rose-400" : "text-emerald-400"}`}>
-                    {singleDeleteTarget.txn_type === "DEBIT" ? "-" : "+"}${Number(singleDeleteTarget.amount).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSingleDeleteTarget(null)}
-                  disabled={isDeletingSingle}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!singleDeleteTarget || !onDeleteTransaction) return;
-                    setIsDeletingSingle(true);
-                    try {
-                      await onDeleteTransaction(singleDeleteTarget.id);
-                      setSingleDeleteTarget(null);
-                    } catch (err) {
-                      console.error("Failed to delete transaction:", err);
-                    } finally {
-                      setIsDeletingSingle(false);
-                    }
-                  }}
-                  disabled={isDeletingSingle}
-                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
-                >
-                  {isDeletingSingle ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Deleting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Confirm Delete</span>
-                    </>
-                  )}
-                </button>
-              </div>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={confirmSingleDelete}
+                disabled={isDeletingSingle}
+              >
+                {isDeletingSingle ? "Deleting..." : "Confirm Delete"}
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete All Confirmation Modal */}
-      {showDeleteAllModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-card border border-border rounded-xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-slate-900/60">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">Delete All Transactions</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Destructive ledger reset</p>
-                </div>
+      {/* Bulk Delete All Modal */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-charcoal border border-white/20 rounded-[32px] p-6 shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center space-x-3 text-danger mb-4">
+              <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
               </div>
-              <button
-                onClick={() => !isDeletingAll && setShowDeleteAllModal(false)}
-                className="text-slate-400 hover:text-white transition"
-                disabled={isDeletingAll}
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <h3 className="text-lg font-bold text-white font-sans">Clear Entire Ledger?</h3>
             </div>
-
-            <div className="p-6 space-y-4">
-              <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs leading-relaxed flex items-start space-x-2.5">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <span>
-                  This action will permanently delete all <strong>{total.toLocaleString()}</strong> transaction records and clear past forecasts. This action cannot be undone.
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-400">
-                Are you sure you want to clear the entire transaction ledger?
-              </p>
-
-              <div className="flex items-center justify-end space-x-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteAllModal(false)}
-                  disabled={isDeletingAll}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!onDeleteAllTransactions) return;
-                    setIsDeletingAll(true);
-                    try {
-                      await onDeleteAllTransactions();
-                      setShowDeleteAllModal(false);
-                    } catch (err) {
-                      console.error("Failed to delete all transactions:", err);
-                    } finally {
-                      setIsDeletingAll(false);
-                    }
-                  }}
-                  disabled={isDeletingAll}
-                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
-                >
-                  {isDeletingAll ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Deleting All...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Yes, Delete All ({total.toLocaleString()})</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            <p className="text-xs text-neutral-300 mb-6 leading-relaxed font-sans">
+              Are you sure you want to delete all <strong className="text-white">{total}</strong> transactions? This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end space-x-3">
+              <Button
+                variant="outline-white"
+                size="sm"
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                disabled={isDeletingBulk}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={confirmBulkDelete}
+                disabled={isDeletingBulk}
+              >
+                {isDeletingBulk ? "Purging..." : "Purge All Data"}
+              </Button>
             </div>
           </div>
         </div>

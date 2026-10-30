@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -10,10 +10,12 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
+  ReferenceLine,
 } from "recharts";
-import { Calendar, AlertCircle, RefreshCw, BarChart3 } from "lucide-react";
+import { AlertCircle, RefreshCw, BarChart3, SlidersHorizontal } from "lucide-react";
 import { ForecastResponse } from "../lib/types";
+import { Pill } from "./ui/Pill";
+import { Button } from "./ui/Button";
 
 interface ForecastChartProps {
   forecastData: ForecastResponse | null;
@@ -35,19 +37,23 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   onGranularityChange,
   onHorizonChange,
   onRefresh,
-  height = 380,
+  height = 420,
   scenarioAdjustment = 0,
 }) => {
-  const [isMounted, setIsMounted] = React.useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [timeRange, setTimeRange] = useState<"3M" | "6M" | "12M" | "ALL">("ALL");
+
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
   // Chronological merge of actuals + forward predictions
-  const chartData = useMemo(() => {
-    if (!forecastData || forecastData.status === "EMPTY") return [];
+  const { chartData, forecastStartDate } = useMemo(() => {
+    if (!forecastData || forecastData.status === "EMPTY") {
+      return { chartData: [], forecastStartDate: null };
+    }
 
-    const data: Array<{
+    const rawData: Array<{
       date: string;
       actual?: number | null;
       predicted?: number | null;
@@ -56,28 +62,34 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
       ci_spread?: number | null;
       lower_ci?: number | null;
       upper_ci?: number | null;
+      isForecast?: boolean;
     }> = [];
 
     // Historical actuals
     (forecastData.historical_series || []).forEach((item) => {
-      data.push({
+      rawData.push({
         date: item.date,
         actual: item.actual,
         predicted: null,
         simulated: null,
         ci_lower: 0,
         ci_spread: 0,
+        isForecast: false,
       });
     });
+
+    let startDate: string | null = null;
 
     // Bridge the final historical point with forecast if present
     const lastHist = forecastData.historical_series?.[forecastData.historical_series.length - 1];
     if (lastHist && forecastData.forecast_payload?.length > 0) {
       const firstF = forecastData.forecast_payload[0];
-      const simVal = scenarioAdjustment !== 0
-        ? Math.max(0, firstF.predicted * (1 + scenarioAdjustment / 100))
-        : null;
-      data.push({
+      startDate = firstF.date;
+      const simVal =
+        scenarioAdjustment !== 0
+          ? Math.max(0, firstF.predicted * (1 + scenarioAdjustment / 100))
+          : null;
+      rawData.push({
         date: firstF.date,
         actual: null,
         predicted: firstF.predicted,
@@ -86,6 +98,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
         ci_spread: Math.max(0, firstF.upper_ci - firstF.lower_ci),
         lower_ci: firstF.lower_ci,
         upper_ci: firstF.upper_ci,
+        isForecast: true,
       });
     }
 
@@ -93,10 +106,11 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
     (forecastData.forecast_payload || []).slice(1).forEach((item) => {
       const lower = Math.max(0, item.lower_ci);
       const upper = Math.max(lower, item.upper_ci);
-      const simVal = scenarioAdjustment !== 0
-        ? Math.max(0, item.predicted * (1 + scenarioAdjustment / 100))
-        : null;
-      data.push({
+      const simVal =
+        scenarioAdjustment !== 0
+          ? Math.max(0, item.predicted * (1 + scenarioAdjustment / 100))
+          : null;
+      rawData.push({
         date: item.date,
         actual: null,
         predicted: item.predicted,
@@ -105,13 +119,27 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
         ci_spread: Math.max(0, upper - lower),
         lower_ci: item.lower_ci,
         upper_ci: item.upper_ci,
+        isForecast: true,
       });
     });
 
-    return data;
-  }, [forecastData, scenarioAdjustment]);
+    // Client-side slice based on range selector
+    if (timeRange === "ALL" || rawData.length === 0) {
+      return { chartData: rawData, forecastStartDate: startDate };
+    }
 
-  // Clean financial tooltip
+    const daysCount = timeRange === "3M" ? 90 : timeRange === "6M" ? 180 : 365;
+    const histItems = rawData.filter((d) => !d.isForecast);
+    const forecastItems = rawData.filter((d) => d.isForecast);
+
+    const slicedHist = histItems.slice(-daysCount);
+    return {
+      chartData: [...slicedHist, ...forecastItems],
+      forecastStartDate: startDate,
+    };
+  }, [forecastData, scenarioAdjustment, timeRange]);
+
+  // Clean financial glass tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
 
@@ -121,32 +149,41 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
     const point = payload[0]?.payload;
 
     return (
-      <div className="bg-slate-900 border border-slate-700/80 rounded-lg p-3 text-xs shadow-xl font-mono">
-        <div className="text-slate-400 mb-2 font-sans font-medium text-[11px] pb-1 border-b border-slate-800">
-          {label}
+      <div className="bg-charcoal/95 border border-white/20 rounded-[20px] p-4 text-xs shadow-2xl backdrop-blur-2xl font-mono text-white min-w-[200px]">
+        <div className="text-neutral-400 mb-2 font-sans font-medium text-[11px] pb-1.5 border-b border-white/10 flex items-center justify-between">
+          <span>{label}</span>
+          <span className="text-[9px] uppercase tracking-wider text-cyber-yellow font-bold">
+            {point?.isForecast ? "Projected" : "Historical"}
+          </span>
         </div>
+
         {actualVal !== null && actualVal !== undefined && (
-          <div className="flex items-center justify-between space-x-4 text-emerald-400 py-0.5">
-            <span>Historical Actual:</span>
-            <span className="font-bold">${(Number(actualVal) || 0).toFixed(2)}</span>
+          <div className="flex items-center justify-between space-x-4 text-cyber-yellow py-0.5">
+            <span className="text-neutral-300 font-sans">Historical Actual:</span>
+            <span className="font-bold tabular-nums">${(Number(actualVal) || 0).toFixed(2)}</span>
           </div>
         )}
+
         {predVal !== null && predVal !== undefined && (
-          <div className="flex items-center justify-between space-x-4 text-blue-400 py-0.5">
-            <span>SARIMA Forecast:</span>
-            <span className="font-bold">${(Number(predVal) || 0).toFixed(2)}</span>
+          <div className="flex items-center justify-between space-x-4 text-white py-0.5">
+            <span className="text-neutral-300 font-sans">SARIMA Forecast:</span>
+            <span className="font-bold tabular-nums">${(Number(predVal) || 0).toFixed(2)}</span>
           </div>
         )}
+
         {simVal !== null && simVal !== undefined && (
           <div className="flex items-center justify-between space-x-4 text-amber-400 py-0.5">
-            <span>Simulated ({scenarioAdjustment > 0 ? `+${scenarioAdjustment}` : scenarioAdjustment}%):</span>
-            <span className="font-bold">${(Number(simVal) || 0).toFixed(2)}</span>
+            <span className="text-neutral-300 font-sans">
+              Simulated ({scenarioAdjustment > 0 ? `+${scenarioAdjustment}` : scenarioAdjustment}%):
+            </span>
+            <span className="font-bold tabular-nums">${(Number(simVal) || 0).toFixed(2)}</span>
           </div>
         )}
+
         {point?.lower_ci !== undefined && point?.upper_ci !== undefined && (
-          <div className="mt-1 pt-1.5 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between space-x-2">
-            <span>90% Confidence Interval:</span>
-            <span className="text-slate-200">
+          <div className="mt-2 pt-2 border-t border-white/10 text-[10px] text-neutral-400 flex items-center justify-between space-x-2">
+            <span className="font-sans">90% CI:</span>
+            <span className="text-neutral-200 tabular-nums font-semibold">
               [${(Number(point.lower_ci) || 0).toFixed(2)}, ${(Number(point.upper_ci) || 0).toFixed(2)}]
             </span>
           </div>
@@ -156,57 +193,68 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
   };
 
   return (
-    <div className="bg-card border border-border/80 rounded-xl p-5 sm:p-6 shadow-subtle flex flex-col justify-between">
-      {/* Top Controls Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border/60">
+    <div className="bg-charcoal/90 border border-white/10 rounded-[32px] p-6 sm:p-8 shadow-glass flex flex-col justify-between backdrop-blur-2xl">
+      {/* Top Header & Interactive Controls Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-white/10">
         <div>
-          <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+          <div className="flex items-center space-x-3 flex-wrap gap-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-sans">
               Spending Forecast & Confidence Ribbon
             </h2>
+            <Pill variant="yellow">90% CI</Pill>
             {scenarioAdjustment !== 0 && (
-              <span
-                className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-mono border font-semibold ${
-                  scenarioAdjustment > 0
-                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                }`}
-              >
-                <span>Simulated: {scenarioAdjustment > 0 ? `+${scenarioAdjustment}` : scenarioAdjustment}%</span>
-              </span>
+              <Pill variant="glass">
+                Simulated: {scenarioAdjustment > 0 ? `+${scenarioAdjustment}` : scenarioAdjustment}%
+              </Pill>
             )}
             {forecastData?.fallback_used && (
-              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <AlertCircle className="w-3 h-3" />
-                <span>Cold Start Fallback</span>
-              </span>
+              <Pill variant="neutral" className="text-amber-400 border-amber-400/30">
+                Fallback Used
+              </Pill>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Historical daily debit series vs. forward SARIMA projection with 90% confidence bands
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+            Deterministic daily ledger series projected forward with bounded SARIMA time-series ribbons
           </p>
         </div>
 
-        {/* Granularity & Horizon Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Controls: Granularity, Horizon, Range & Refresh */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Time Range Slicer */}
+          <div className="flex items-center p-1 rounded-full bg-deep-gray border border-white/10 text-xs">
+            {(["3M", "6M", "12M", "ALL"] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setTimeRange(r)}
+                className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-all duration-200 ${
+                  timeRange === r
+                    ? "bg-white text-black shadow-sm"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
           {/* Granularity Toggle */}
-          <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-border text-xs">
+          <div className="flex items-center p-1 rounded-full bg-deep-gray border border-white/10 text-xs">
             <button
               onClick={() => onGranularityChange("DAILY")}
-              className={`px-3 py-1 text-xs rounded-md font-medium transition ${
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${
                 granularity === "DAILY"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-white"
+                  ? "bg-cyber-yellow text-black font-bold shadow-sm"
+                  : "text-neutral-400 hover:text-white"
               }`}
             >
               Daily (s=7)
             </button>
             <button
               onClick={() => onGranularityChange("WEEKLY")}
-              className={`px-3 py-1 text-xs rounded-md font-medium transition ${
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${
                 granularity === "WEEKLY"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-white"
+                  ? "bg-cyber-yellow text-black font-bold shadow-sm"
+                  : "text-neutral-400 hover:text-white"
               }`}
             >
               Weekly (s=4)
@@ -214,15 +262,15 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
           </div>
 
           {/* Horizon Selector */}
-          <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-border text-xs">
+          <div className="flex items-center p-1 rounded-full bg-deep-gray border border-white/10 text-xs">
             {[14, 30, 60, 90].map((h) => (
               <button
                 key={h}
                 onClick={() => onHorizonChange(h)}
-                className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${
+                className={`px-2.5 py-1 rounded-full text-xs font-mono font-semibold transition-all duration-200 ${
                   horizon === h
-                    ? "bg-slate-700 text-white shadow-sm font-semibold"
-                    : "text-muted-foreground hover:text-white"
+                    ? "bg-white/20 text-white font-bold"
+                    : "text-neutral-400 hover:text-white"
                 }`}
               >
                 {h}d
@@ -234,77 +282,115 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
           <button
             onClick={onRefresh}
             disabled={loading}
-            className="p-1.5 rounded-lg bg-slate-900 border border-border hover:bg-slate-800 text-muted-foreground hover:text-white transition disabled:opacity-50"
+            className="w-8 h-8 rounded-full bg-deep-gray border border-white/10 hover:border-white/30 flex items-center justify-center text-neutral-300 hover:text-white transition-all duration-200 disabled:opacity-50 active:scale-95"
             title="Refit SARIMA parameters"
+            aria-label="Refit model"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-400" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-cyber-yellow" : ""}`} />
           </button>
         </div>
       </div>
 
+      {/* Legend Chips */}
+      <div className="flex flex-wrap items-center gap-3 pt-4 text-xs font-mono">
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-deep-gray border border-white/10">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyber-yellow" />
+          <span className="text-white font-medium">Historical Spend</span>
+        </div>
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-deep-gray border border-white/10">
+          <span className="w-3.5 h-0.5 border-b-2 border-dashed border-white" />
+          <span className="text-white font-medium">SARIMA Forecast</span>
+        </div>
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-deep-gray border border-white/10">
+          <span className="w-3.5 h-2 rounded bg-cyber-yellow/20 border border-cyber-yellow/40" />
+          <span className="text-white font-medium">90% Confidence Ribbon</span>
+        </div>
+        {scenarioAdjustment !== 0 && (
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-deep-gray border border-white/10">
+            <span className="w-3.5 h-0.5 border-b-2 border-dotted border-amber-400" />
+            <span className="text-amber-400 font-medium">Simulated</span>
+          </div>
+        )}
+      </div>
+
       {/* Chart Canvas */}
-      <div style={{ height: `${height}px` }} className="mt-5 w-full">
+      <div style={{ height: `${height}px` }} className="mt-4 w-full">
         {loading || !isMounted ? (
           <div className="h-full flex flex-col items-center justify-center space-y-3">
-            <RefreshCw className="w-7 h-7 text-blue-500 animate-spin" />
-            <p className="text-xs text-muted-foreground font-mono">
-              {!isMounted ? "Initializing visualization engine..." : "Running AIC Grid Search & Stationarity Tests..."}
+            <RefreshCw className="w-8 h-8 text-cyber-yellow animate-spin" />
+            <p className="text-xs text-neutral-400 font-mono tracking-widest uppercase">
+              {!isMounted ? "Initializing visualization engine..." : "Fitting SARIMA Parameters & AIC Grid..."}
             </p>
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center space-y-2 border border-dashed border-border/80 rounded-xl p-6 text-center">
-            <BarChart3 className="w-10 h-10 text-slate-600" />
-            <p className="text-sm font-medium text-slate-300">
+          <div className="h-full flex flex-col items-center justify-center space-y-3 border-2 border-dashed border-white/10 rounded-[28px] p-8 text-center bg-white/[0.02]">
+            <div className="w-12 h-12 rounded-full bg-deep-gray flex items-center justify-center text-neutral-400">
+              <BarChart3 className="w-6 h-6" />
+            </div>
+            <p className="text-base font-semibold text-white">
               {forecastData?.status === "EMPTY" && forecastData?.model_notes
                 ? forecastData.model_notes
                 : "No historical transaction series to plot"}
             </p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Upload a bank statement (PDF or image) to extract transaction records and fit the time-series model.
+            <p className="text-xs text-neutral-400 max-w-md leading-relaxed">
+              Upload a bank statement PDF to extract transaction tables and calibrate the forward SARIMA time-series forecast.
             </p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 10, bottom: 0 }}>
               <defs>
-                <linearGradient id="ciGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.22} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.03} />
+                {/* 90% Confidence Ribbon Gradient */}
+                <linearGradient id="fanRibbonGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FDE047" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#FFFFFF" stopOpacity={0.06} />
+                </linearGradient>
+                {/* Historical Area Fill Gradient */}
+                <linearGradient id="historicalSpendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FDE047" stopOpacity={0.20} />
+                  <stop offset="100%" stopColor="#FDE047" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+
+              <CartesianGrid strokeDasharray="2 4" stroke="#262626" vertical={false} />
+
               <XAxis
                 dataKey="date"
-                stroke="#64748B"
+                stroke="#737373"
                 fontSize={11}
                 tickLine={false}
-                axisLine={{ stroke: "#1E293B" }}
+                axisLine={{ stroke: "#262626" }}
                 tickFormatter={(val) => {
                   const parts = val.split("-");
                   return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : val;
                 }}
               />
               <YAxis
-                stroke="#64748B"
+                stroke="#737373"
                 fontSize={11}
                 tickLine={false}
-                axisLine={{ stroke: "#1E293B" }}
+                axisLine={{ stroke: "#262626" }}
                 tickFormatter={(v) => `$${v}`}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                verticalAlign="top"
-                height={32}
-                formatter={(value) => {
-                  if (value === "actual") return <span className="text-xs text-emerald-400 font-medium">Historical Spend</span>;
-                  if (value === "predicted") return <span className="text-xs text-blue-400 font-medium">SARIMA Baseline</span>;
-                  if (value === "simulated") return <span className="text-xs text-amber-400 font-medium">Simulated Scenario</span>;
-                  if (value === "ci_spread") return <span className="text-xs text-blue-300/80 font-medium">90% Confidence Interval</span>;
-                  return value;
-                }}
-              />
 
-              {/* Stacked Confidence Interval Ribbon: Invisible base + translucent fill */}
+              <Tooltip content={<CustomTooltip />} />
+
+              {/* Vertical line where forecast begins */}
+              {forecastStartDate && (
+                <ReferenceLine
+                  x={forecastStartDate}
+                  stroke="#737373"
+                  strokeDasharray="3 3"
+                  label={{
+                    value: "Forecast starts",
+                    fill: "#A3A3A3",
+                    fontSize: 10,
+                    position: "top",
+                  }}
+                />
+              )}
+
+              {/* 1. Stacked Confidence Interval Ribbon: Invisible base + translucent fan fill */}
               <Area
                 type="monotone"
                 dataKey="ci_lower"
@@ -312,7 +398,6 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
                 stroke="none"
                 fill="transparent"
                 isAnimationActive={false}
-                legendType="none"
               />
               <Area
                 name="ci_spread"
@@ -320,43 +405,52 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
                 dataKey="ci_spread"
                 stackId="ci"
                 stroke="none"
-                fill="url(#ciGradient)"
+                fill="url(#fanRibbonGradient)"
                 isAnimationActive={false}
               />
 
-              {/* Historical Spend Actuals */}
+              {/* 2. Soft Area under Historical Spend */}
+              <Area
+                type="monotone"
+                dataKey="actual"
+                stroke="none"
+                fill="url(#historicalSpendFill)"
+                isAnimationActive={false}
+              />
+
+              {/* 3. Historical Spend Actuals: Solid Flat Cyber-Yellow */}
               <Line
                 name="actual"
                 type="monotone"
                 dataKey="actual"
-                stroke="#10B981"
-                strokeWidth={2}
-                dot={{ r: 2, fill: "#10B981" }}
-                activeDot={{ r: 4, fill: "#10B981" }}
+                stroke="#FDE047"
+                strokeWidth={2.5}
+                dot={{ r: 2.5, fill: "#FDE047" }}
+                activeDot={{ r: 5, fill: "#FDE047" }}
                 connectNulls={false}
               />
 
-              {/* SARIMA Forecast Line */}
+              {/* 4. SARIMA Forecast: Dashed White Line */}
               <Line
                 name="predicted"
                 type="monotone"
                 dataKey="predicted"
-                stroke="#3B82F6"
+                stroke="#FFFFFF"
                 strokeWidth={2.2}
                 strokeDasharray="4 4"
-                dot={{ r: 3, fill: "#3B82F6" }}
-                activeDot={{ r: 5, fill: "#60A5FA" }}
+                dot={{ r: 3, fill: "#FFFFFF" }}
+                activeDot={{ r: 5, fill: "#FFFFFF" }}
                 connectNulls={true}
               />
 
-              {/* Optional Simulated Scenario Line */}
+              {/* 5. Optional Simulated Scenario Line */}
               {scenarioAdjustment !== 0 && (
                 <Line
                   name="simulated"
                   type="monotone"
                   dataKey="simulated"
                   stroke="#F59E0B"
-                  strokeWidth={2.2}
+                  strokeWidth={2}
                   strokeDasharray="2 2"
                   dot={{ r: 3, fill: "#F59E0B" }}
                   activeDot={{ r: 5, fill: "#FBBF24" }}
@@ -370,10 +464,11 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({
 
       {/* Model Diagnostics Footnote */}
       {forecastData?.model_notes && (
-        <div className="mt-4 pt-3 border-t border-border/60 text-[11px] text-muted-foreground font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+        <div className="mt-6 pt-4 border-t border-white/10 text-xs text-neutral-400 font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <span>{forecastData.model_notes}</span>
-          <span className="text-slate-300">
-            SARIMA Order: <span className="text-blue-400 font-semibold">{forecastData.sarima_order || "None"}</span>
+          <span className="text-white">
+            SARIMA Order:{" "}
+            <span className="text-cyber-yellow font-bold">{forecastData.sarima_order || "None"}</span>
           </span>
         </div>
       )}

@@ -17,72 +17,68 @@ const config: Config = {
           "BlinkMacSystemFont",
           '"Segoe UI"',
           "Roboto",
-          "Oxygen",
-          "Ubuntu",
-          "Cantarell",
           "sans-serif",
         ],
         mono: [
           "var(--font-mono)",
           '"JetBrains Mono"',
-          '"Geist Mono"',
           "ui-monospace",
           "SFMono-Regular",
-          "Menlo",
-          "Monaco",
-          "Consolas",
           "monospace",
         ],
       },
       colors: {
+        // Hyper-Saturated Fluid Tokens
+        "cyber-yellow": "#FDE047", // The single shout color (flat, never gradient)
+        onyx: "#0A0A0A",          // Main page background / "void"
+        charcoal: "#171717",      // Secondary dark panels
+        "deep-gray": "#262626",   // UI elements inside the void
+        white: "#FFFFFF",
+        // Semantic data colors (sparingly for credit/debit and trend chips)
+        success: "#4ADE80",
+        danger: "#F87171",
+        // Compatibility variables
         background: "var(--background)",
         foreground: "var(--foreground)",
-        canvas: "#0B0F19",
-        card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
-          subtle: "#141C2E",
-          hover: "#1A253D",
-        },
-        border: {
-          DEFAULT: "var(--border)",
-          subtle: "#1E293B",
-          highlight: "#334155",
-        },
-        primary: {
-          DEFAULT: "#2563EB", // Electric Royal Blue
-          hover: "#1D4ED8",
-          foreground: "#FFFFFF",
-          subtle: "rgba(37, 99, 235, 0.12)",
-        },
-        accent: {
-          DEFAULT: "#10B981", // Emerald Cashflow
-          foreground: "#FFFFFF",
-          subtle: "rgba(16, 185, 129, 0.12)",
-        },
-        expense: {
-          DEFAULT: "#F43F5E", // Rose / Outflow
-          foreground: "#FFFFFF",
-          subtle: "rgba(244, 63, 94, 0.12)",
-        },
-        warning: {
-          DEFAULT: "#F59E0B",
-          subtle: "rgba(245, 158, 11, 0.12)",
-        },
-        info: {
-          DEFAULT: "#0284C7",
-          subtle: "rgba(2, 132, 199, 0.12)",
-        },
-        muted: {
-          DEFAULT: "#64748B",
-          foreground: "#94A3B8",
-          subtle: "#1E293B",
-        },
+        border: "var(--border)",
+      },
+      borderRadius: {
+        "panel": "32px",
+        "liquid-hero": "120px",
+        "liquid-subtle": "40px",
       },
       boxShadow: {
-        subtle: "0 1px 2px 0 rgba(0, 0, 0, 0.25)",
-        card: "0 4px 20px -2px rgba(0, 0, 0, 0.35)",
-        glow: "0 0 20px -5px rgba(37, 99, 235, 0.25)",
+        "glass": "0 20px 50px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12)",
+        "glass-yellow": "0 20px 50px -10px rgba(253, 224, 71, 0.25), 0 0 0 1px rgba(253, 224, 71, 0.3)",
+        "yellow-glow": "0 0 35px -5px rgba(253, 224, 71, 0.4)",
+        "subtle": "0 2px 8px 0 rgba(0, 0, 0, 0.3)",
+      },
+      keyframes: {
+        float: {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-12px) rotate(1deg)" },
+        },
+        ticker: {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "0.6", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.05)" },
+        },
+      },
+      animation: {
+        float: "float 6s ease-in-out infinite",
+        "float-slow": "float-slow 8s ease-in-out infinite",
+        ticker: "ticker 25s linear infinite",
+        "pulse-glow": "pulse-glow 3s ease-in-out infinite",
+      },
+      transitionTimingFunction: {
+        "fluid": "cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

@@ -6,13 +6,14 @@ import { Navbar } from "../../components/Navbar";
 import { Footer } from "../../components/Footer";
 import { TransactionTable } from "../../components/TransactionTable";
 import { UploadModal } from "../../components/UploadModal";
+import { Button } from "../../components/ui/Button";
+import { Pill } from "../../components/ui/Pill";
 import { fetchTransactions, updateCategory, deleteTransaction, deleteAllTransactions } from "../../lib/api";
 import { Transaction } from "../../lib/types";
 import {
   Receipt,
   Download,
   Filter,
-  DollarSign,
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
@@ -96,24 +97,24 @@ export default function TransactionsLedgerPage() {
     .reduce((acc, t) => acc + (typeof t.amount === "number" ? t.amount : parseFloat(String(t.amount)) || 0), 0);
 
   return (
-    <div className="min-h-screen flex flex-col bg-canvas selection:bg-blue-600/30 selection:text-white">
+    <div className="min-h-screen flex flex-col bg-onyx text-white selection:bg-cyber-yellow selection:text-black">
       <Navbar onOpenUpload={() => setIsUploadOpen(true)} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 sm:px-8 py-10 space-y-8">
         {/* Breadcrumb Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
           <div>
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground font-mono mb-1">
+            <div className="flex items-center space-x-2 text-[10px] font-mono tracking-widest text-neutral-400 mb-1">
               <Link href="/" className="hover:text-white transition">
                 OVERVIEW
               </Link>
               <span>/</span>
-              <span className="text-blue-400">TRANSACTION LEDGER</span>
+              <span className="text-cyber-yellow font-bold">TRANSACTION LEDGER</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white font-sans">
               Normalized Bank Statement Ledger
             </h1>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-neutral-400 mt-1">
               Auditable transaction records extracted deterministically with cryptographic SHA-256 deduplication
             </p>
           </div>
@@ -125,57 +126,57 @@ export default function TransactionsLedgerPage() {
                 setPageSize(Number(e.target.value));
                 setPage(1);
               }}
-              className="py-1.5 px-3 rounded-lg bg-slate-900 border border-border text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer font-mono"
+              className="py-2 px-4 rounded-full bg-deep-gray border border-white/10 text-xs text-white focus:outline-none focus:border-cyber-yellow cursor-pointer font-mono"
             >
-              <option value={15}>15 per page</option>
-              <option value={25}>25 per page</option>
-              <option value={50}>50 per page</option>
-              <option value={100}>100 per page</option>
+              <option value={15} className="bg-charcoal text-white">15 per page</option>
+              <option value={25} className="bg-charcoal text-white">25 per page</option>
+              <option value={50} className="bg-charcoal text-white">50 per page</option>
+              <option value={100} className="bg-charcoal text-white">100 per page</option>
             </select>
           </div>
         </div>
 
         {/* Aggregate Filtered Ribbon */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-card border border-border/80 shadow-subtle flex items-center justify-between font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="p-6 rounded-[32px] bg-charcoal/90 border border-white/10 shadow-glass backdrop-blur-2xl flex items-center justify-between font-mono">
             <div>
-              <span className="text-[11px] font-sans text-muted-foreground block mb-1">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-1">
                 Total Matches
               </span>
-              <span className="text-xl font-bold text-white">
+              <span className="text-2xl font-bold text-white tabular-nums">
                 {total.toLocaleString()} records
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-slate-800 text-slate-300">
-              <Receipt className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-full bg-deep-gray border border-white/10 flex items-center justify-center text-cyber-yellow">
+              <Receipt className="w-5 h-5" />
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border/80 shadow-subtle flex items-center justify-between font-mono">
+          <div className="p-6 rounded-[32px] bg-charcoal/90 border border-white/10 shadow-glass backdrop-blur-2xl flex items-center justify-between font-mono">
             <div>
-              <span className="text-[11px] font-sans text-muted-foreground block mb-1">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-1">
                 Visible Debit Outflow
               </span>
-              <span className="text-xl font-bold text-rose-400">
+              <span className="text-2xl font-bold text-danger tabular-nums">
                 -${pageDebitSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <ArrowUpRight className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-full bg-danger/10 border border-danger/20 flex items-center justify-center text-danger">
+              <ArrowUpRight className="w-5 h-5" />
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border/80 shadow-subtle flex items-center justify-between font-mono">
+          <div className="p-6 rounded-[32px] bg-charcoal/90 border border-white/10 shadow-glass backdrop-blur-2xl flex items-center justify-between font-mono">
             <div>
-              <span className="text-[11px] font-sans text-muted-foreground block mb-1">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-1">
                 Visible Credit Inflow
               </span>
-              <span className="text-xl font-bold text-emerald-400">
+              <span className="text-2xl font-bold text-success tabular-nums">
                 +${pageCreditSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ArrowDownLeft className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-full bg-success/10 border border-success/20 flex items-center justify-center text-success">
+              <ArrowDownLeft className="w-5 h-5" />
             </div>
           </div>
         </div>

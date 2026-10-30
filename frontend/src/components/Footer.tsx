@@ -1,96 +1,122 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
-import { ShieldCheck, Cpu, Database, FileSpreadsheet } from "lucide-react";
+import { ShieldCheck, Cpu, Database, Activity, ArrowUpRight } from "lucide-react";
+import { Pill } from "./ui/Pill";
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="w-full border-t border-border/80 bg-slate-950/70 text-xs text-muted-foreground mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div className="md:col-span-2 space-y-3">
-            <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white tracking-tight text-sm font-sans">
-                FinWise Statement Intelligence
+    <footer className="w-full bg-charcoal/80 border-t border-white/10 rounded-t-[48px] text-xs text-neutral-400 mt-20 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-12">
+          {/* Brand & Mission Column */}
+          <div className="md:col-span-5 space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-black border border-white/20 flex items-center justify-center">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyber-yellow" />
+              </div>
+              <span className="font-bold text-white text-lg tracking-tight font-sans">
+                Fluxo
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <Pill variant="yellow" className="text-[9px] px-2 py-0.5">
                 SARIMA v1.2
-              </span>
+              </Pill>
             </div>
-            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-              Deterministic tabular extraction from unstructured bank statements, robust SHA-256 ledger deduplication, and automated seasonal autoregressive time-series spend forecasting.
+            <p className="text-xs text-neutral-400 max-w-sm leading-relaxed">
+              Deterministic tabular extraction from bank statements, cryptographically deduplicated PostgreSQL ledger normalization, and automated SARIMA spending forecasts with 90% confidence ribbons.
             </p>
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-400">
-              <span className="inline-flex items-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+            <div className="flex flex-wrap items-center gap-2 pt-2 text-[11px] font-mono">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-deep-gray border border-white/10 text-neutral-300">
+                <ShieldCheck className="w-3 h-3 text-cyber-yellow mr-1.5" />
                 Zero-Loss Ledger
               </span>
-              <span>•</span>
-              <span className="inline-flex items-center">
-                <Database className="w-3.5 h-3.5 text-blue-400 mr-1" />
-                PostgreSQL Storage
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-deep-gray border border-white/10 text-neutral-300">
+                <Database className="w-3 h-3 text-white mr-1.5" />
+                PostgreSQL
               </span>
-              <span>•</span>
-              <span className="inline-flex items-center">
-                <Cpu className="w-3.5 h-3.5 text-purple-400 mr-1" />
-                SARIMA Grid Search
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-deep-gray border border-white/10 text-neutral-300">
+                <Cpu className="w-3 h-3 text-cyber-yellow mr-1.5" />
+                SARIMAX Engine
               </span>
             </div>
           </div>
 
-          <div>
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">
-              Feature Pages
+          {/* Navigation Links */}
+          <div className="md:col-span-3">
+            <h4 className="text-[10px] font-bold text-white uppercase tracking-widest font-mono mb-4">
+              Dashboard Navigation
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2.5 text-xs font-sans">
               <li>
-                <Link href="/" className="hover:text-white transition">
-                  Executive Overview
+                <Link href="/" className="hover:text-white transition flex items-center group">
+                  <span>Executive Overview</span>
+                  <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </li>
               <li>
-                <Link href="/forecast" className="hover:text-white transition">
-                  Forecast Studio & Scenarios
+                <Link href="/forecast" className="hover:text-white transition flex items-center group">
+                  <span>Forecast Studio & Scenarios</span>
+                  <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </li>
               <li>
-                <Link href="/transactions" className="hover:text-white transition">
-                  Transaction Ledger
+                <Link href="/transactions" className="hover:text-white transition flex items-center group">
+                  <span>Transaction Ledger</span>
+                  <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </li>
               <li>
-                <Link href="/analytics" className="hover:text-white transition">
-                  Spending Analytics
+                <Link href="/analytics" className="hover:text-white transition flex items-center group">
+                  <span>Spending Distribution</span>
+                  <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </li>
               <li>
-                <Link href="/statements" className="hover:text-white transition">
-                  Statement Ingestion Pipeline
+                <Link href="/statements" className="hover:text-white transition flex items-center group">
+                  <span>Statement Ingestion Pipeline</span>
+                  <ArrowUpRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div>
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">
-              Engine Specifications
+          {/* Architecture Specifications */}
+          <div className="md:col-span-4">
+            <h4 className="text-[10px] font-bold text-white uppercase tracking-widest font-mono mb-4">
+              System Architecture
             </h4>
-            <ul className="space-y-1.5 font-mono text-[11px] text-slate-400">
-              <li>Extractor: Digital table + OCR</li>
-              <li>Model: SARIMA (p,d,q)(P,D,Q)s</li>
-              <li>Loss Metric: AIC & RMSE</li>
-              <li>Deduplication: SHA-256 row hash</li>
-              <li>Confidence: 90% parameter ribbon</li>
+            <ul className="space-y-2 font-mono text-[11px] text-neutral-400">
+              <li className="flex justify-between py-1 border-b border-white/5">
+                <span>Tabular Extractor</span>
+                <span className="text-white">JVM CLI + OCR</span>
+              </li>
+              <li className="flex justify-between py-1 border-b border-white/5">
+                <span>Time-Series Model</span>
+                <span className="text-cyber-yellow">SARIMA (p,d,q)(P,D,Q)s</span>
+              </li>
+              <li className="flex justify-between py-1 border-b border-white/5">
+                <span>Model Optimization</span>
+                <span className="text-white">Bounded AIC Grid</span>
+              </li>
+              <li className="flex justify-between py-1 border-b border-white/5">
+                <span>Ledger Deduplication</span>
+                <span className="text-white">SHA-256 Row Hash</span>
+              </li>
+              <li className="flex justify-between py-1">
+                <span>Confidence Envelope</span>
+                <span className="text-cyber-yellow font-bold">90% Parametric Ribbon</span>
+              </li>
             </ul>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
-          <p>© {new Date().getFullYear()} FinWise Systems. Institutional Bank Statement Intelligence.</p>
-          <div className="flex items-center space-x-4">
-            <span className="inline-flex items-center text-slate-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
-              All systems operational
-            </span>
+        {/* Bottom Bar */}
+        <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono">
+          <p>© {new Date().getFullYear()} Fluxo Systems. Bank Statement Intelligence.</p>
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-neutral-300">All analytics systems operational</span>
           </div>
         </div>
       </div>
